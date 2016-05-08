@@ -1,0 +1,140 @@
+---
+title: "assignment1.rmd"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment will be described in multiple parts. You will need to write a report that answers the questions detailed below. Ultimately, you will need to complete the entire assignment in a single R markdown document that can be processed by knitr and be transformed into an HTML file.
+
+Throughout your report make sure you always include the code that you used to generate the output you present. When writing code chunks in the R markdown document, always use echo = TRUE so that someone else will be able to read the code. This assignment will be evaluated via peer assessment so it is essential that your peer evaluators be able to review the code for your analysis.
+
+For the plotting aspects of this assignment, feel free to use any plotting system in R (i.e., base, lattice, ggplot2)
+
+Fork/clone the GitHub repository created for this assignment. You will submit this assignment by pushing your completed files into your forked repository on GitHub. The assignment submission will consist of the URL to your GitHub repository and the SHA-1 commit ID for your repository state.
+
+NOTE: The GitHub repository also contains the dataset for the assignment so you do not have to download the data separately.
+
+Loading and preprocessing the data
+Show any code that is needed to
+1.Load the data (i.e. read.csv())
+2.Process/transform the data (if necessary) into a format suitable for your analysis
+
+```{r}
+library(plyr)
+library(lattice)
+library(data.table)
+library(httr)
+library(ggplot2)
+direccion <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+datas <- "datas"
+if(!file.exists(datas)){
+  dir.create(datas)
+} 
+pics <- "pics" 
+if(!file.exists(pics)){
+  dir.create(pics)
+}
+zip <- paste(getwd(), "/activity.zip", sep = "")
+if(!file.exists(zip)){
+    download.file(direccion, zip)
+}
+archieve <- paste(getwd(), "/datas/activity.csv", sep = "")
+if(!file.exists(archieve)){
+    unzip(zip, list = FALSE, overwrite = FALSE, exdir = datas)
+}
+
+activity <- read.table(file = archieve, header = TRUE, sep = ",")
+```
+
+What is mean total number of steps taken per day?
+For this part of the assignment, you can ignore the missing values in the dataset.
+1.Calculate the total number of steps taken per day
+2.If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+3.Calculate and report the mean and median of the total number of steps taken per day
+```{r}
+activity$date_and_time <- as.POSIXct(with(activity, paste(date, paste(interval %/% 100, interval %% 100, sep=":"))),
+    format="%Y-%m-%d %H:%M",tz="")
+
+stepperday <- setNames(aggregate(steps~as.Date(date), activity, sum, na.rm = TRUE), c("date","steps"))
+
+xaxis <- seq(1, nrow(stepperday), by = 6)
+
+escale <- list(x = list(rot = 45, cex = 1.0, labels = format(stepperday$date, "%d-%b-%Y")[xaxis], at = xaxis))
+
+barchart(date ~ steps, data = stepperday, main = "steps per day", ylab = "steps", xlab = "date", scales = escale, horizontal = F)
+
+paste("mean:", mean(stepperday$steps))
+paste("median:", median(stepperday$steps))
+```
+What is the average daily activity pattern?
+1.Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+2.Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+timeseries <- aggregate(steps ~ interval, data = activity, FUN = mean)
+plot(timeseries, type = "l", axes = F, xlab = "Time of the day", 
+    ylab = "Average across all days provided a time", main = "Average number of steps taken", 
+    col = "red")
+axis(1,at=c(seq(0,2400,100),835), label = paste(c(seq(0,24,1),8),c(rep(":00",25),":40"),sep=""), pos = 0)
+axis(2, at=c(seq(0,210,30),206.2), label = c(seq(0,210,30),206.2), pos = 0)
+max <- which.max(timeseries$steps)
+segments(832, 0, 832, 206.2, col = "blue", lty = "dashed")
+text(835,200, "max average of steps: (832,206.2)", col = "blue", adj = c(-.1, -.1))
+segments(0, 206.2, 832, 206.2, col = "blue", lty = "dashed")
+timeseries [max, ]
+#which.max(timeseries$steps)/12
+paste(835, "is equivalent to 8.667 hours, this gives the maximum is reached at 8:40 am")
+
+```
+Imputing missing values
+Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+1.Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+2.Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+3.Create a new dataset that is equal to the original dataset but with the missing data filled in.
+4.Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r}
+paste("missing observations:", sum(is.na(activity$steps)))
+
+"missing observations can be replaced with the sample mean instead of replacing them by zero (the 1st won't bias the estimates while the 2nd will)"
+
+newdatas <- activity
+newdatas[is.na(activity$steps), ]$steps <- mean(activity$steps)
+
+newdatas$date_and_time <- as.POSIXct(with(newdatas, paste(date, paste(interval %/% 100, interval %% 100, sep=":"))),
+    format="%Y-%m-%d %H:%M",tz="")
+
+stepperday2 <- setNames(aggregate(steps~as.Date(date), newdatas, sum, na.rm = TRUE), c("date","steps"))
+
+xaxis <- seq(1, nrow(stepperday2), by = 6)
+
+escale2 <- list(x = list(rot = 45, cex = 1.0, labels = format(stepperday2$date, "%d-%b-%Y")[xaxis], at = xaxis))
+
+barchart(date ~ steps, data = stepperday2, main = "steps per day", ylab = "steps", xlab = "date", scales = escale2, horizontal = F)
+
+paste("mean:", mean(stepperday2$steps))
+paste("median:", median(stepperday2$steps))
+
+paste("means difference:", mean(stepperday2$steps)-mean(stepperday$steps))
+paste("medians difference:", median(stepperday2$steps)-median(stepperday$steps))
+```
+Are there differences in activity patterns between weekdays and weekends?
+For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+1.Create a new factor variable in the dataset with two levels ??? gweekdayh and gweekendh indicating whether a given date is a weekday or weekend day.
+2.Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+```{r}
+str(newdatas)
+newdatas$date <- as.Date(newdatas$date, "%Y-%m-%d")
+newdatas$day <- weekdays(newdatas$date)
+newdatas$daytype <- c("weekday")
+for (i in 1:nrow(newdatas)){
+  if (newdatas$day[i] == "Saturday" || newdatas$day[i] == "Sunday"){
+    newdatas$daytype[i] <- "weekend"
+  }
+}
+newdatas$daytype <- as.factor(newdatas$daytype)
+weekdaysends <- aggregate(steps ~ interval+daytype, newdatas, mean)
+qplot(interval, steps, data=weekdaysends, geom=c("line"), xlab="5-min intervals", 
+      ylab="steps mean", main="") + facet_wrap(~ daytype, ncol=1)
+```
